@@ -1,8 +1,8 @@
 {
   "files": {
-    "main.css": "/umang/static/css/main.a3ffa150.chunk.css",
-    "main.js": "/umang/static/js/main.c8c6fe70.chunk.js",
-    "main.js.map": "/umang/static/js/main.c8c6fe70.chunk.js.map",
+    "main.css": "/umang/static/css/main.6193ee4e.chunk.css",
+    "main.js": "/umang/static/js/main.5ae3ff68.chunk.js",
+    "main.js.map": "/umang/static/js/main.5ae3ff68.chunk.js.map",
     "runtime-main.js": "/umang/static/js/runtime-main.81a53510.js",
     "runtime-main.js.map": "/umang/static/js/runtime-main.81a53510.js.map",
     "static/js/2.aa0e502c.chunk.js": "/umang/static/js/2.aa0e502c.chunk.js",
@@ -10,14 +10,14 @@
     "static/js/3.e9686035.chunk.js": "/umang/static/js/3.e9686035.chunk.js",
     "static/js/3.e9686035.chunk.js.map": "/umang/static/js/3.e9686035.chunk.js.map",
     "index.html": "/umang/index.html",
-    "static/css/main.a3ffa150.chunk.css.map": "/umang/static/css/main.a3ffa150.chunk.css.map",
+    "static/css/main.6193ee4e.chunk.css.map": "/umang/static/css/main.6193ee4e.chunk.css.map",
     "static/js/2.aa0e502c.chunk.js.LICENSE.txt": "/umang/static/js/2.aa0e502c.chunk.js.LICENSE.txt",
     "static/media/main.scss": "/umang/static/media/Quicksand-SemiBold.d4f6bc51.ttf"
   },
   "entrypoints": [
     "static/js/runtime-main.81a53510.js",
     "static/js/2.aa0e502c.chunk.js",
-    "static/css/main.a3ffa150.chunk.css",
-    "static/js/main.c8c6fe70.chunk.js"
+    "static/css/main.6193ee4e.chunk.css",
+    "static/js/main.5ae3ff68.chunk.js"
   ]
 }
