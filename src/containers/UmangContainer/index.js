@@ -44,7 +44,7 @@ class UmangContainer extends React.Component {
                             <div className="heading">WHERE</div>
                             <div className="detail"><a href="https://goo.gl/maps/VRvoocp5mfuYDFKD8" target="_blank">ISKCON GHAZIABAD</a></div>
                             <div className="heading">WHEN</div>
-                            <div className="detail">Republic Day, 26th January 2021</div>
+                            <div className="detail">Independence Day, 15 August 2021</div>
                         </div>
                         <div className="poster">
                             <img src="https://res.cloudinary.com/dnuq1lgqs/image/upload/v1610361682/UMANG_izkbiv.jpg" />

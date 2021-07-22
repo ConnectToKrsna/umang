@@ -19,10 +19,11 @@ class AppComponent extends React.Component {
         <Router>
           <Switch>
             <Route path={ROUTE.HOME} component={UmangContainer} exact />
+            <Route path={ROUTE.UMANG} component={UmangContainer} exact />
             <Route path={ROUTE.UMANG_LIST} component={UmangRegListContainer} exact />
             <Route path={ROUTE.UMANG_VOLUNTEER} component={UmangVolunteerContainer} exact />
             <Route render={() => {
-              return <Redirect to={ROUTE.HOME} />
+              return <Redirect to={ROUTE.UMANG} />
             }} />
           </Switch>
         </Router>
