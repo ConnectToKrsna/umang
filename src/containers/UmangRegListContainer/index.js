@@ -1,253 +1,398 @@
 import React, { Component } from "react";
-import DataTable, { createTheme, memoize } from 'react-data-table-component';
-import { fetchAllRegistrations, markAttendance, updateUser } from "../../services/umang";
+import DataTable from "react-data-table-component";
+import {
+  fetchAllRegistrations,
+  markAttendance,
+  updateRegistration,
+} from "../../services/UmangService";
 import { COLUMNS } from "./constants";
 import "./style.scss";
+import { QrReader } from "react-qr-reader";
 
 class UmangRegListContainer extends Component {
-    constructor(props) {
-        super(props);
-        this.state = {
-            data: [],
-            filteredData: [],
-            searchText: '',
-            editPopup: null,
-            viewPopup: null,
-        };
-    }
-    componentDidMount() {
-        fetchAllRegistrations()
-            .then((res) => {
-                this.setState({
-                    data: res.data.map(reg => ({ ...reg, registeredOn: new Date(reg.registeredOn).toDateString() })),
-                })
-            })
-            .catch(err => {
-                alert("Error:", err.message);
-            })
-    }
-
-    convertArrayOfObjectsToCSV = (array) => {
-        let result;
-
-        const columnDelimiter = ',';
-        const lineDelimiter = '\n';
-        // const keys = Object.keys(data[0]);
-        const names = COLUMNS(() => {}, false).map(e => e.name).slice(0, -1);
-        const keys = COLUMNS(() => {}, false).map(e => e.selector).slice(0, -1);
-
-        result = '';
-        result += names.join(columnDelimiter);
-        result += lineDelimiter;
-
-        array.forEach(item => {
-            let ctr = 0;
-            keys.forEach(key => {
-                if (ctr > 0) result += columnDelimiter;
-
-                result += item[key].toString().replace(',', '.');
-
-                ctr++;
-            });
-            result += lineDelimiter;
-        });
-
-        return result;
-    }
-
-    // Blatant "inspiration" from https://codepen.io/Jacqueline34/pen/pyVoWr
-    downloadCSV = (array) => {
-        // const link = document.createElement('a');
-        let csv = this.convertArrayOfObjectsToCSV(array);
-        if (csv == null) return;
-
-        const filename = 'export.csv';
-
-        if (!csv.match(/^data:text\/csv/i)) {
-            csv = `data:text/csv;charset=utf-8,${csv}`;
+  constructor(props) {
+    super(props);
+    this.state = {
+      data: [],
+      filteredData: [],
+      searchText: "",
+      editPopup: null,
+      viewPopup: null,
+      showDialog: true,
+      processing: true,
+      qrScanner: false,
+    };
+  }
+  componentDidMount() {
+    fetchAllRegistrations()
+      .then((res) => {
+        if (res?.data?.message) {
+          alert(res.data.message);
+          return;
         }
-
-        this.exportRef.setAttribute('href', encodeURI(csv));
-        this.exportRef.setAttribute('download', filename);
-        // this.exportRef.click();
-    }
-
-    onSearch = (e) => {
-        const {
-            data
-        } = this.state;
-        const value = e.target.value;
-        const lowered = value && value.toLowerCase();
         this.setState({
-            filteredData: data.filter(participant => {
-                return (
-                    (participant.registrationCode.toLowerCase()).includes(lowered)
-                    || (participant.name.toLowerCase()).includes(lowered)
-                    || (participant.email.toLowerCase()).includes(lowered)
-                    || (participant.contact.toString().toLowerCase()).includes(lowered)
-                    || (participant.registeredBy.toLowerCase()).includes(lowered)
-                )
-            }),
-            searchText: value,
-        })
+          data: res.data.utsahList.map(this.mapUtsahRegistrations),
+        });
+      })
+      .catch((err) => {
+        alert("Error:", err.message);
+      });
+  }
+
+  mapUtsahRegistrations = (reg) => {
+    return {
+      _id: reg.devoteeInfo?.[0]?._id,
+      name: reg.devoteeInfo?.[0]?.name,
+      email: reg.devoteeInfo?.[0]?.email,
+      contact: reg.devoteeInfo?.[0]?.contact,
+      registeredOn: new Date(reg.registeredOn).toDateString(),
+      registeredBy: reg.registeredBy,
+      isBgIncluded: reg.isBgIncluded,
+      remarks: reg.remarks,
+      uuid: reg.ticket_id,
+      attendance: reg.present ? "present" : "absent",
+    };
+  };
+
+  convertArrayOfObjectsToCSV = (array) => {
+    let result;
+
+    const columnDelimiter = ",";
+    const lineDelimiter = "\n";
+    // const keys = Object.keys(data[0]);
+    const names = COLUMNS(() => {}, false)
+      .map((e) => e.name)
+      .slice(0, -1);
+    const keys = COLUMNS(() => {}, false)
+      .map((e) => typeof e.selector === 'string' ? e.selector : 'isBgIncluded')
+      .slice(0, -1);
+
+    result = "";
+    result += names.join(columnDelimiter);
+    result += lineDelimiter;
+
+    array.forEach((item) => {
+      let ctr = 0;
+      keys.forEach((key) => {
+        if (ctr > 0) result += columnDelimiter; 
+        result += item[key].toString().replace(",", ".");
+
+        ctr++;
+      });
+      result += lineDelimiter;
+    });
+
+    return result;
+  };
+
+  // Blatant "inspiration" from https://codepen.io/Jacqueline34/pen/pyVoWr
+  downloadCSV = (array) => {
+    // const link = document.createElement('a');
+    let csv = this.convertArrayOfObjectsToCSV(array);
+    if (csv == null) return;
+
+    const filename = "export.csv";
+
+    if (!csv.match(/^data:text\/csv/i)) {
+      csv = `data:text/csv;charset=utf-8,${csv}`;
     }
 
-    handleButtonClick = (type, row) => {
-        switch (type) {
-            case 'edit': {
-                this.setState({ editPopup: row });
-                break;
-            }
-            case 'view': {
-                this.setState({ viewPopup: row });
-                break;
-            }
-            case 'attend': {
-                this.setState({disabled: true})
-                markAttendance(row.id, !row.isPresent)
-                    .then((res) => {
-                        const updatedData = this.state.data.map(participant => {
-                            if (participant.id === row.id) {
-                                participant.isPresent = !row.isPresent
-                            }
-                            return participant;
-                        });
-                        this.setState({
-                            data: updatedData,
-                            disabled: false,
-                        })
-                    }).catch(err => {
-                        this.setState({disabled: false})
-                        alert(err.message);
-                    })
-            }
-            default:
-        }
-    }
+    this.exportRef.setAttribute("href", encodeURI(csv));
+    this.exportRef.setAttribute("download", filename);
+    // this.exportRef.click();
+  };
 
-    sendUpdateRequest = () => {
-        const {
-            editPopup: {
-                id,
-                name,
-                email,
-                contact,
-                moneyPaid,
-                remarks,
-                withBhagavadGita,
-                location,
-                registeredBy,
-                institute,
-            },
-        } = this.state;
-        updateUser({
-            id,
-            name,
-            email,
-            contact,
-            location,
-            remarks,
-            withBhagavadGita,
-            moneyPaid,
-            registeredBy,
-            institute,
-        }).then((res) => {
-            const updatedData = this.state.data.map(participant => {
-                if (participant.id === id) {
-                    participant.name = name;
-                    participant.email = email;
-                    participant.contact = contact;
-                    participant.moneyPaid = moneyPaid;
-                    participant.registeredBy = registeredBy;
-                    participant.institute = institute;
-                }
-                return participant;
-            });
-            this.setState({
-                data: updatedData,
-                editPopup: null,
-            })
-        }).catch(err => {
-            alert(err.message);
-            this.setState({
-                editPopup: null,
-            })
-        })
-    }
-
-    render() {
-        const {
-            data,
-            searchText,
-            filteredData,
-            editPopup,
-            viewPopup,
-            disabled,
-        } = this.state;
+  onSearch = (e) => {
+    const { data } = this.state;
+    const value = e.target.value;
+    const lowered = value && value.toLowerCase();
+    this.setState({
+      filteredData: data.filter((participant) => {
         return (
-            <div className="reg-list-container">
-                <div className="header-bar">
-                    <a ref={(ref) => { this.exportRef = ref; }} onClick={() => this.downloadCSV(data)}><button>Export to CSV</button></a>
-                    <input autoComplete="off" id="search" type="text" placeholder="Search by Ticket ID / Name/ Email / Phone number" aria-label="Search Input" value={searchText} onChange={this.onSearch} />
-                </div>
-                <DataTable
-                    title="All Umang Registrations"
-                    columns={COLUMNS(this.handleButtonClick, disabled)}
-                    data={searchText.length ? filteredData : data}
-                    pagination
-                    selectableRows
-                    dense
-                />
-                {editPopup && <div className="popup-outer" onClick={() => {this.setState({ editPopup: null })}}>
-                    <div className="popup-inner" onClick={(e) => {e.stopPropagation()}}>
-                        <ul className="edit-sheet">
-                            <li>Name<br /><b>
-                                <input autoComplete="off" value={editPopup.name}
-                                onChange={(e) => {this.setState({editPopup: {...editPopup, name: e.target.value}})}}/>
-                            </b></li>
-                            <li>Email<br /><b>
-                                <input autoComplete="off" value={editPopup.email}
-                                onChange={(e) => {this.setState({editPopup: {...editPopup, email: e.target.value}})}}/>
-                            </b></li>
-                            <li>Contact<br /><b>
-                                <input autoComplete="off" value={editPopup.contact}
-                                onChange={(e) => {this.setState({editPopup: {...editPopup, contact: e.target.value}})}}/>
-                            </b></li>
-                            <li>Money Paid<br /><b>
-                                <input autoComplete="off" value={editPopup.moneyPaid}
-                                onChange={(e) => {this.setState({editPopup: {...editPopup, moneyPaid: e.target.value}})}}/>
-                            </b></li>
-                            <li>Institute<br /><b>
-                                <input autoComplete="off" value={editPopup.institute}
-                                onChange={(e) => {this.setState({editPopup: {...editPopup, institute: e.target.value}})}}/>
-                            </b></li>
-                            <li>Registered By<br /><b>
-                                <input autoComplete="off" value={editPopup.registeredBy}
-                                onChange={(e) => {this.setState({editPopup: {...editPopup, registeredBy: e.target.value}})}}/>
-                            </b></li>
-                        </ul>
-                        <button onClick={this.sendUpdateRequest}>UPDATE</button>
-                    </div>
-                </div>}
-                {viewPopup && <div className="popup-outer" onClick={() => this.setState({ viewPopup: null })}>
-                    <div className="popup-inner" onClick={(e) => {e.stopPropagation()}}>
-                        <ul className="view-sheet">
-                            <li>Ticket ID: <b>{viewPopup.registrationCode}</b></li>
-                            <li>Name: <b>{viewPopup.name}</b></li>
-                            <li>Email: <b>{viewPopup.email}</b></li>
-                            <li>Contact: <b>{viewPopup.contact}</b></li>
-                            <li>Registered by: <b>{viewPopup.registeredBy}</b></li>
-                            <li>With Bhagavad Gita: <b>{viewPopup.withBhagavadGita ? 'YES' : 'NO'}</b></li>
-                            <li>Money left to be paid: <b>Rs. {viewPopup.moneyLeftToBePaid}</b></li>
-                            <li>Remarks: <b>{viewPopup.remarks}</b></li>
-                            <li>Institute: <b>{viewPopup.institute}</b></li>
-                            <li>Registered on: <b>{viewPopup.registeredOn}</b></li>
-                        </ul>
-                    </div>
-                </div>}
-            </div>
-        )
+          participant.uuid?.toLowerCase().includes(lowered) ||
+          participant.name?.toLowerCase().includes(lowered) ||
+          participant.email?.toLowerCase().includes(lowered) ||
+          participant.contact.toString()?.toLowerCase().includes(lowered) ||
+          participant.registeredBy?.toLowerCase().includes(lowered)
+        );
+      }),
+      searchText: value,
+    });
+  };
+
+  handleMarkAttendance(ticketId, isPresent, name = null) {
+    markAttendance(ticketId, isPresent)
+      .then((res) => {
+        if (name) {
+          alert(
+            `Hare Krishna ${name} prbhu, Your attendance is marked successfully.`
+          );
+        }
+        this.setState(
+          {
+            data: res.data.utsahList.map(this.mapUtsahRegistrations),
+            disabled: false,
+          },
+          () => {
+            this.onSearch({ target: { value: this.state.searchText } });
+          }
+        );
+      })
+      .catch((err) => {
+        this.setState({ disabled: false });
+        alert(err?.response?.data?.message || err.message);
+      });
+  }
+
+  handleButtonClick = (type, row) => {
+    switch (type) {
+      case "edit": {
+        this.setState({ editPopup: row });
+        break;
+      }
+      case "view": {
+        this.setState({ viewPopup: row });
+        break;
+      }
+      case "attend": {
+        this.setState({ disabled: true });
+        this.handleMarkAttendance(
+          row.uuid,
+          row.attendance === "absent" ? true : false
+        );
+      }
+      default:
     }
+  };
+
+  sendUpdateRequest = () => {
+    const {
+      editPopup: { _id, email, contact },
+    } = this.state;
+    updateRegistration({
+      _id,
+      email,
+      contact,
+    })
+      .then(() => {
+        const updatedData = this.state.data.map((participant) => {
+          if (participant._id === _id) {
+            return {
+              ...participant,
+              email: email,
+              contact: contact,
+            };
+          }
+          return participant;
+        });
+        this.setState({
+          data: updatedData,
+          editPopup: null,
+        });
+      })
+      .catch((err) => {
+        alert(err.message);
+        this.setState({
+          editPopup: null,
+        });
+      });
+  };
+
+  render() {
+    const { data, searchText, filteredData, editPopup, viewPopup, disabled } =
+      this.state;
+    const isMobile = window.screen.width <= 600;
+    const width = isMobile ? window.screen.width - 20 : window.screen.width / 4; 
+    return (
+      <div className="reg-list-container">
+        <div
+          style={{
+            width: width + "px",
+            heigth: width + "px",
+            alignSelf: "center",
+          }}
+        >
+          {this.state.qrScanner ? (
+            <QrReader
+              ref={(ref) => (this.qrRef = ref)}
+              scanDelay={500}
+              onError={(err) => {
+                alert(err);
+              }}
+              constraints={{
+                facingMode: "environment",
+              }}
+              onResult={(result, error) => {
+                if (!!result) {
+                  if (this.state.qrScanner) {
+                    let parsedTicketData = JSON.parse(result.text);
+                    if (
+                      this.state.data.filter(
+                        (el) =>
+                          el.uuid === parsedTicketData.ticketId &&
+                          el.attendance === "present"
+                      ).length > 0
+                    ) {
+                      alert("Devotee already present");
+                    } else if (
+                      this.state.data.filter(
+                        (el) =>
+                          el.uuid === parsedTicketData.ticketId &&
+                          el.attendance === "absent"
+                      ).length > 0
+                    ) {
+                      // this.setState({qrScanner: false});
+                      this.handleMarkAttendance(
+                        parsedTicketData.ticketId,
+                        true,
+                        parsedTicketData.name
+                      );
+                    } else {
+                      alert("Ticket not found");
+                    }
+                    this.setState({ searchText: parsedTicketData.ticketId });
+                    this.onSearch({
+                      target: { value: parsedTicketData.ticketId },
+                    });
+                  }
+                }
+              }}
+            />
+          ) : null}
+        </div>
+        <div className="header-bar">
+          <a
+            ref={(ref) => {
+              this.exportRef = ref;
+            }}
+            onClick={() => this.downloadCSV(data)}
+          >
+            <button>Export to CSV</button>
+          </a>
+
+          <div>
+            <button
+              onClick={() => {
+                this.setState({ qrScanner: true });
+              }}
+            >
+              Show Qr Scanner
+            </button>
+          </div>
+          <input
+            autoComplete="off"
+            id="search"
+            type="text"
+            placeholder="Search by Ticket ID / Name/ Email / Phone number"
+            aria-label="Search Input"
+            value={searchText}
+            onChange={this.onSearch}
+          />
+        </div>
+        <DataTable
+          title={`All UMANG Registrations | Total (${
+            this.state.data?.length
+          }) | Present(${
+            this.state.data?.filter((el) => el.attendance === "present").length
+          })`}
+          columns={COLUMNS(this.handleButtonClick, disabled)}
+          data={searchText.length ? filteredData : data}
+          pagination
+          selectableRows
+          dense
+        />
+        {editPopup && (
+          <div
+            className="popup-outer"
+            onClick={() => {
+              this.setState({ editPopup: null });
+            }}
+          >
+            <div
+              className="popup-inner"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <ul className="edit-sheet">
+                <li>
+                  Email
+                  <br />
+                  <b>
+                    <input
+                      autoComplete="off"
+                      value={editPopup.email}
+                      onChange={(e) => {
+                        this.setState({
+                          editPopup: { ...editPopup, email: e.target.value },
+                        });
+                      }}
+                    />
+                  </b>
+                </li>
+                <li>
+                  Contact
+                  <br />
+                  <b>
+                    <input
+                      autoComplete="off"
+                      value={editPopup.contact}
+                      onChange={(e) => {
+                        this.setState({
+                          editPopup: { ...editPopup, contact: e.target.value },
+                        });
+                      }}
+                    />
+                  </b>
+                </li>
+              </ul>
+              <button onClick={this.sendUpdateRequest}>UPDATE</button>
+            </div>
+          </div>
+        )}
+        {viewPopup && (
+          <div
+            className="popup-outer"
+            onClick={() => this.setState({ viewPopup: null })}
+          >
+            <div
+              className="popup-inner"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <ul className="view-sheet">
+                <li>
+                  Ticket ID: <b>{viewPopup.uuid}</b>
+                </li>
+                <li>
+                  Name: <b>{viewPopup.name}</b>
+                </li>
+                <li>
+                  Email: <b>{viewPopup.email}</b>
+                </li>
+                <li>
+                  Contact: <b>{viewPopup.contact}</b>
+                </li>
+                <li>
+                  Registered by: <b>{viewPopup.registeredBy}</b>
+                </li>
+                <li>
+                  Remarks: <b>{viewPopup.remarks}</b>
+                </li>
+                <li>
+                  Remarks: <b>{viewPopup.isBgIncluded}</b>
+                </li>
+                <li>
+                  Registered on: <b>{viewPopup.registeredOn}</b>
+                </li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 }
 
 export default UmangRegListContainer;
